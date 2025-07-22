@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass
 from functools import wraps
 import logging
-from docx import Document
+# from docx import Document
 import PyPDF2
 from bs4 import BeautifulSoup
 import time
@@ -370,7 +370,6 @@ class RAGSystem:
             for file in files:
                 searchable_text = f"{file.original_filename} {file.description} {file.extracted_text}"
                 score = self.calculate_relevance_with_claude(query, searchable_text, api_key)
-                print("score: ", score)
                 if score > 0.1:
                     results.append(QueryResult(
                         content=file.description,
@@ -385,7 +384,6 @@ class RAGSystem:
         if 'links' in content_types:
             links = Link.query.filter_by(user_id=user_id).all()
             for link in links:
-                print("Links: ", link)
                 searchable_text = f"{link.title} {link.description} {link.url}"
                 # score = self._calculate_relevance(query, searchable_text)
                 score = self.calculate_relevance_with_claude(query, searchable_text, api_key)
@@ -567,7 +565,6 @@ class RAGSystem:
             response.raise_for_status()
             
             claude_response = response.json()["content"][0]["text"]
-            print("claude_resp", claude_response)
             
             return {
                 "response": claude_response,
@@ -618,7 +615,6 @@ class RAGSystem:
             response.raise_for_status()
             
             claude_response = response.json()["content"][0]["text"]
-            print("claude_resp", claude_response)
             
             return {
                 "response": claude_response,
@@ -752,8 +748,6 @@ class RAGSystem:
                 Student's question: {query}
 
                 Please provide a helpful response based on the student's content. If you're summarizing or answering about specific dates, focus on the most relevant information."""
-            print("system --------------------")
-            print(system_prompt)
             return [{"role": "user", "content": system_prompt}]
         
         # For continuing conversations, use chat history
@@ -780,8 +774,6 @@ class RAGSystem:
             
             # If this is a new conversation, include full context
             system_prompt = f"""{query}"""
-            print("system --------------------")
-            print(system_prompt)
             return [{"role": "user", "content": system_prompt}]
     
     def get_chat_history(self, session_id: str) -> Dict:
@@ -1241,7 +1233,6 @@ def claude_chat():
             user.claude_api_key, message, context, session_id
         )
         
-        print("response: ", type(response))
         claude_response = response.get("response")
         
         # Add Claude's response to history
@@ -1340,7 +1331,6 @@ def save_chat(session_id):
             'search_context': session.search_context,
             'chat_history': session.chat_history
         }
-        print("saved_data", save_data)
         with open(filename, 'w') as f:
             json.dump(save_data, f, indent=2)
         
@@ -1383,7 +1373,8 @@ def list_sessions():
 
 # Helper Functions
 def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'}
+    # ALLOWED_EXTENSIONS = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'}
+    ALLOWED_EXTENSIONS = {'txt', 'pdf'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def extract_metadata_from_url(url):
@@ -1467,7 +1458,7 @@ def logina():
         if user and check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
             session['username'] = user.username
-            return jsonify({'success': True, 'redirect': url_for('ragdashboard')})
+            return jsonify({'success': True, 'redirect': url_for('personalArchiveHomepage')})
         else:
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
     
@@ -1507,23 +1498,20 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-@app.route('/ragdashboard')
+@app.route('/archive')
 # @requires_auth
-def dashboard():
+def archive():
     # user = User.query.get(session['user_id'])
-    return render_template('ragdashboard.html')
+    return render_template('personalArchiveHomepage.html')
 
 # API Routes
 @app.route('/api/notesb', methods=['GET', 'POST'])
 #@requires_auth
 def handle_notesb():
     token = request.headers.get('Authorization')
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)
-    # user_id = (token)
-    print("token: ", user_id)
     # Get user and validate API key
     user = User.query.get(user_id)
     
@@ -1550,7 +1538,6 @@ def handle_notesb():
     
     elif request.method == 'POST':
         data = request.get_json()
-        print("Note: ", data)
         message = f"""Summarize the contents of the document context for my note page. Return only the results needed for the note.
             Remove any characters, just display some text from each source, if any. Add the entire chat context, if any. 
             {data}
@@ -1592,7 +1579,6 @@ def handle_notesb():
 # @requires_auth
 def handle_note(note_id):
     token = request.headers.get('Authorization')
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)
@@ -1670,11 +1656,11 @@ def call_claude_with_file(user_id, message, file_id, session_id, context=""):
                 file_content = ""
                 for page in reader.pages:
                     file_content += page.extract_text()
-        elif file_extension in ['.docx']:
+        # elif file_extension in ['.docx']:
             # Word documents (requires python-docx)
             
-            doc = Document(file_path)
-            file_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+            # doc = Document(file_path)
+            # file_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
         else:
             return {'error': f'Unsupported file type: {file_extension}'}, 400
         
@@ -1687,7 +1673,7 @@ def call_claude_with_file(user_id, message, file_id, session_id, context=""):
             {file_content}
             """
         
-        print("got prep: ", enhanced_context)
+        #print("got prep: ", enhanced_context)
         
         # Call Claude API with file contents
         response = rag_system.query_claude_files(
@@ -1697,7 +1683,7 @@ def call_claude_with_file(user_id, message, file_id, session_id, context=""):
             session_id
         )
         
-        print("response: ", type(response))
+        # print("response: ", type(response))
         claude_response = response.get("response")
         
         # Add Claude's response to history
@@ -1716,7 +1702,6 @@ def call_claude_with_file(user_id, message, file_id, session_id, context=""):
 # @requires_auth
 def handle_files():
     token = request.headers.get('Authorization')
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)
@@ -1734,7 +1719,6 @@ def handle_files():
         } for file in files])
     
     elif request.method == 'POST':
-        print("request: ", request.files['files'])
         if 'files' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
         
@@ -1765,44 +1749,48 @@ def handle_files():
             db.session.add(file_record)
             db.session.commit()
             
-            message = "Summarize the contents of the document context provided for academic purposes. I am a student continually learning."
-            file_id = file_record.id
-            session_id = 'default'
-            context = ""
-            
-            result, status_code = call_claude_with_file(
-                user_id, message, file_id, session_id, context
-            )
-            # Update the description with Claude's response
-            if status_code == 200:
-                # Extract just the response text, not the whole result dict
-                claude_response = result.get('response', '')
-                file_record.description = claude_response
-                db.session.commit()  # Save the updated description
+            available_files = ["txt", "pdf", '.md', 'py', 'js', 'html', 'css', 'json']
+            if file_record.file_type in available_files:
+                message = "Summarize the contents of the document context provided for academic purposes. I am a student continually learning."
+                file_id = file_record.id
+                session_id = 'default'
+                context = ""
                 
-                return jsonify({
-                    'success': True, 
-                    'file_id': file_record.id,
-                    'description': claude_response
-                })
-            else:
-                # Handle error case
-                return jsonify({
-                    'success': False,
-                    'error': result.get('error', 'Unknown error')
-                }), status_code
+                result, status_code = call_claude_with_file(
+                    user_id, message, file_id, session_id, context
+                )
+                # Update the description with Claude's response
+                if status_code == 200:
+                    # Extract just the response text, not the whole result dict
+                    claude_response = result.get('response', '')
+                    file_record.description = claude_response
+                    db.session.commit()  # Save the updated description
+                    
+                    return jsonify({
+                        'success': True, 
+                        'file_id': file_record.id
+                    }), status_code
+                else:
+                    # Handle error case
+                    return jsonify({
+                        'success': False,
+                        'error': result.get('error', 'Unknown error')
+                    }), status_code
             # file_record.description = str(result)
             
             # print("result file read: ", result)
             # return jsonify({'success': True, 'id': file_record.id})
-        
+            else:
+                return jsonify({
+                        'success': True, 
+                        'file_id': file_record.id
+                    }), 200
         return jsonify({'error': 'Invalid file type'}), 400
 
 @app.route('/api/files/<int:file_id>/download')
 # @requires_auth
 def download_file(file_id):
     token = request.headers.get('Authorization')
-    print("token: ", token)
     user_id = ""
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
@@ -1817,7 +1805,6 @@ def download_file(file_id):
 # @requires_auth
 def delete_file(file_id):
     token = request.headers.get('Authorization')
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)
@@ -1838,70 +1825,69 @@ def delete_file(file_id):
 # @requires_auth
 def handle_links():
     token = request.headers.get('Authorization')
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)
-    user = User.query.get(user_id)
-    if not user.claude_api_key:
-        return jsonify({'error': 'Claude API key not configured'}), 400
-    if request.method == 'GET':
-        links = Link.query.filter_by(user_id=user_id).order_by(Link.created_at.desc()).all()
-        return jsonify([{
-            'id': link.id,
-            'url': link.url,
-            'title': link.title,
-            'description': link.description,
-            'favicon': link.favicon,
-            'tags': json.loads(link.tags) if link.tags else [],
-            'subject': link.subject,
-            'created_at': link.created_at.isoformat()
-        } for link in links])
-    
-    elif request.method == 'POST':
-        data = request.get_json()
-        url = data.get('url')
+    with app.app_context():    
+        user = User.query.get(user_id)
+        if not user.claude_api_key:
+            return jsonify({'error': 'Claude API key not configured'}), 400
+        if request.method == 'GET':
+            links = Link.query.filter_by(user_id=user_id).order_by(Link.created_at.desc()).all()
+            return jsonify([{
+                'id': link.id,
+                'url': link.url,
+                'title': link.title,
+                'description': link.description,
+                'favicon': link.favicon,
+                'tags': json.loads(link.tags) if link.tags else [],
+                'subject': link.subject,
+                'created_at': link.created_at.isoformat()
+            } for link in links])
         
-        if not url:
-            return jsonify({'error': 'URL is required'}), 400
-        
-        # Extract metadata
-        metadata = extract_metadata_from_url(url)
-        
-        # Example 2: Just summarize a URL
-        summary = rag_system.summarize_url(
-            api_key=user.claude_api_key,
-            url=url,
-            focus_query="Educational questions and pages only."
-        )
-        print("SUMMARY OF URL: ", summary)
-        
-        description_str = data.get('description', metadata['description'])
-        joined_description = f"""{description_str}
-                Claude Summary: 
-                
-                {summary.get('response')}"""
+        elif request.method == 'POST':
+            data = request.get_json()
+            url = data.get('url')
+            
+            if not url:
+                return jsonify({'error': 'URL is required'}), 400
+            
+            # Extract metadata
+            metadata = extract_metadata_from_url(url)
+            
+            # Example 2: Just summarize a URL
+            summary = rag_system.summarize_url(
+                api_key=user.claude_api_key,
+                url=url,
+                focus_query="Educational questions and pages only."
+            )
+            print("SUMMARY OF URL: ", summary)
+            
+            description_str = data.get('description', metadata['description'])
+            joined_description = f"""{description_str}
+                    Claude Summary: 
+                    
+                    {summary.get('response')}"""
 
-        link = Link(
-            url=url,
-            title=data.get('title', metadata['title']),
-            description=joined_description,
-            favicon=metadata['favicon'],
-            tags=json.dumps(data.get('tags', [])),
-            subject=data.get('subject', ''),
-            user_id=user_id
-        )
-        
-        db.session.add(link)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'id': link.id})
+            link = Link(
+                url=url,
+                title=data.get('title', metadata['title']),
+                description=joined_description,
+                favicon=metadata['favicon'],
+                tags=json.dumps(data.get('tags', [])),
+                subject=data.get('subject', ''),
+                user_id=user_id
+            )
+            
+            db.session.add(link)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'id': link.id})
 
 @app.route('/api/links/<int:link_id>', methods=['DELETE'])
 #@requires_auth
 def delete_link(link_id):
     token = request.headers.get('Authorization')
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)
@@ -1919,10 +1905,14 @@ def delete_link(link_id):
 def search():
     data = request.get_json()
     query = data.get('query', '')
-    content_types = data.get('content_types', ['notes', 'files', 'links'])
+    filters = data.get('filters', {})
+    # Extract content types based on filters sent
+    content_types = []
+    for key in ['notes', 'files', 'links']:
+        if filters.get(key):
+            content_types.append(key)
     token = request.headers.get('Authorization')
     user_id = ""
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)
@@ -1949,7 +1939,6 @@ def claude_query():
     data = request.get_json()
     query = data.get('query', '')
     token = request.headers.get('Authorization')
-    print("token: ", token)
     user_id = ""
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
@@ -1998,20 +1987,21 @@ def register():
             return jsonify({'message': 'Password must be at least 6 characters long'}), 400
         
         # Check if user already exists
-        if User.query.filter_by(email=email).first():
-            return jsonify({'message': 'Email already registered'}), 409
-        
-        # Create new user
-        user = User(username=name, email=email)
-        user.set_password(password)
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'User created successfully',
-            'user': user.to_dict()
-        }), 201
+        with app.app_context():
+            if User.query.filter_by(email=email).first():
+                return jsonify({'message': 'Email already registered'}), 409
+            
+            # Create new user
+            user = User(username=name, email=email)
+            user.set_password(password)
+            
+            db.session.add(user)
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'User created successfully',
+                'user': user.to_dict()
+            }), 201
         
     except Exception as e:
         db.session.rollback()
@@ -2099,7 +2089,6 @@ def login():
 #@requires_auth
 def handle_settings():
     token = request.headers.get('Authorization')
-    print("token: ", token)
     user_id = ""
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
@@ -2126,7 +2115,6 @@ def handle_settings():
 #@requires_auth
 def dashboard_stats():
     token = request.headers.get('Authorization')
-    print("token: ", token)
     if token and token.startswith('Bearer '):
         token = token.split(' ')[1]
         user_id = verify_token_b(token)

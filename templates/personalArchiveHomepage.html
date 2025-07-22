@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
     <title>Student Personal Archive</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles/ragstyles.css') }}">
 </head>
@@ -20,7 +22,7 @@
                     <button class="nav-btn" data-section="settings">Settings</button>
                 </nav>
                 <div class="user-info">
-                    <span id="username">Loading...</span>
+                    <span id="username"></span>
                     <button id="logout-btn">Logout</button>
                 </div>
             </div>
@@ -31,7 +33,7 @@
             <!-- Search Section -->
             <section id="search-section" class="section active">
                 <div class="search-container">
-                    <h2>🔍 Search Your Knowledge Base</h2>
+                    <h2>🔍 Search Your Archive</h2>
                     <div class="search-box">
                         <input type="text" id="search-input" placeholder="Ask me anything about your notes, files, or links..." />
                         <button id="search-btn">Search</button>
@@ -134,11 +136,11 @@
                             <option value="high">High</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <!-- <div class="form-group">
                         <label>
                             <input type="checkbox" id="note-is-todo"> Is Todo
                         </label>
-                    </div>
+                    </div> -->
                     <div class="form-group" id="due-date-group" style="display: none;">
                         <label for="note-due-date">Due Date:</label>
                         <input type="datetime-local" id="note-due-date">
@@ -242,7 +244,7 @@
             document.getElementById('add-note-btn').addEventListener('click', () => openNoteModal());
             document.getElementById('note-form').addEventListener('submit', saveNote);
             document.getElementById('cancel-note').addEventListener('click', closeNoteModal);
-            document.getElementById('note-is-todo').addEventListener('change', toggleDueDateField);
+            // document.getElementById('note-is-todo').addEventListener('change', toggleDueDateField);
 
             // File management
             document.getElementById('upload-btn').addEventListener('click', uploadFiles);
@@ -534,10 +536,10 @@
             document.getElementById('note-subject').value = note.subject || '';
             document.getElementById('note-tags').value = note.tags ? note.tags.join(', ') : '';
             document.getElementById('note-priority').value = note.priority;
-            document.getElementById('note-is-todo').checked = note.is_todo;
-            document.getElementById('note-due-date').value = note.due_date ? note.due_date.slice(0, 16) : '';
+            // document.getElementById('note-is-todo').checked = note.is_todo;
+            // document.getElementById('note-due-date').value = note.due_date ? note.due_date.slice(0, 16) : '';
             
-            toggleDueDateField();
+            // toggleDueDateField();
         }
 
         function saveNote(e) {
@@ -550,7 +552,8 @@
                 subject: document.getElementById('note-subject').value,
                 tags: document.getElementById('note-tags').value.split(',').map(t => t.trim()).filter(t => t),
                 priority: document.getElementById('note-priority').value,
-                is_todo: document.getElementById('note-is-todo').checked,
+                // is_todo: document.getElementById('note-is-todo').checked,
+                is_todo: false,
                 due_date: document.getElementById('note-due-date').value || null
             };
 
@@ -559,6 +562,7 @@
             const url = noteId ? `/api/notes/${noteId}` : '/api/notesb';
             const token = localStorage.getItem('token');
             const token_str = 'Bearer ' + token;
+            showLoading();
             fetch(url, {
                 method: method,
                 headers: {'Content-Type': 'application/json', 'Authorization': token_str},
@@ -571,7 +575,10 @@
                 } else {
                     document.getElementById('claude-api-key').value = '';
                     loadSettings();
-                    showSuccess('API Key saved successfully!');
+                    hideLoading();
+                    showSuccess('Note saved successfully!');
+                    closeNoteModal();
+                    
                 }
             })
             .catch(error => {
@@ -668,11 +675,11 @@
             }
         }
 
-        function toggleDueDateField() {
-            const checkbox = document.getElementById('note-is-todo');
-            const dueDateGroup = document.getElementById('due-date-group');
-            dueDateGroup.style.display = checkbox.checked ? 'block' : 'none';
-        }
+        // function toggleDueDateField() {
+        //     const checkbox = document.getElementById('note-is-todo');
+        //     const dueDateGroup = document.getElementById('due-date-group');
+        //     dueDateGroup.style.display = checkbox.checked ? 'block' : 'none';
+        // }
 
         function closeNoteModal() {
             document.getElementById('note-modal').style.display = 'none';
@@ -798,14 +805,25 @@
             div.className = 'content-item file-item';
             
             const fileIcon = getFileIcon(file.file_type);
-            
+            // <div class="item-actions">
+            //             <button onclick="downloadFile(${file.id})">Download</button>
+            //             <button onclick="deleteFile(${file.id})">Delete</button>
+            //         </div>
             div.innerHTML = `
                 <div class="item-header">
                     <h4>${fileIcon} ${file.filename}</h4>
-                    <div class="item-actions">
-                        <button onclick="downloadFile(${file.id})">Download</button>
-                        <button onclick="deleteFile(${file.id})">Delete</button>
+                    <div class="dropdown" style="margin-bottom: 2vh;">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="actionDropdown-${file.id}" data-bs-toggle="dropdown" aria-expanded="false">
+                            &#8942;
+                        </button>
+                    
+                        <!-- Dropdown Menu -->
+                        <ul class="dropdown-menu dropdown-menu dropdown-menu-end" id="menu-actionDropdown-${file.id}" aria-labelledby="actionDropdown-${file.id}">
+                            <li> <button onclick="downloadFile(${file.id})" class="dropdown-valve-item dropdown-item btn w-100 text-black">Download</button></li>
+                            <li><button onclick="deleteFile(${file.id})" class="dropdown-item btn btn-success w-100 text-black">Delete</button></li>
+                        </ul>
                     </div>
+                    
                 </div>
                 <div class="item-meta">
                     <div class="description-container">
@@ -973,7 +991,6 @@
                 <div class="item-header">
                     <h4><a href="${link.url}" target="_blank">${link.title || link.url}</a></h4>
                     <div class="item-actions">
-                        <button onclick="editLink(${link.id})">Edit</button>
                         <button onclick="deleteLink(${link.id})">Delete</button>
                     </div>
                 </div>
@@ -1037,6 +1054,7 @@
             const url = linkId ? `/api/links/${linkId}` : '/api/links';
             const token = localStorage.getItem('token');
             const token_str = 'Bearer ' + token;
+            showLoading();
             fetch(url, {
                 method: method,
                 headers: {'Content-Type': 'application/json',  'Authorization': token_str},
@@ -1044,6 +1062,7 @@
             })
             .then(response => response.json())
             .then(data => {
+                hideLoading();
                 if (data.error) {
                     showError(data.error);
                 } else {
@@ -1053,6 +1072,7 @@
                 }
             })
             .catch(error => {
+                hideLoading();
                 console.error('Failed to save link:', error);
                 showError('Failed to save link.');
             });
@@ -1187,11 +1207,12 @@
             
             // Display results
             const resultsContainer = document.createElement('div');
-            resultsContainer.className = 'results-container';
+            resultsContainer.className = 'results-container-b';
             
             results.forEach(result => {
                 const resultElement = document.createElement('div');
                 resultElement.className = 'search-result';
+                resultElement.id = `result-${result.source_id}`;
                 
                 let typeIcon = '';
                 switch(result.source_type) {
@@ -1216,6 +1237,9 @@
                     <div class="result-header">
                         <span class="result-type">${typeIcon} ${result.source_type}</span>
                         <span class="result-score">Score: ${result.relevance_score.toFixed(2)}</span>
+                        <button onclick="removeResult('${result.source_id}')" class="btn btn-sm btn-danger remove-btn">
+                            ❌ Remove
+                        </button>
                     </div>
                     <h3>${result.title}</h3>
                     <div class="description-container">
@@ -1237,6 +1261,22 @@
             });
             
             container.appendChild(resultsContainer);
+        }
+
+        function removeResult(sourceId) {
+            // Remove from DOM
+            const resultElement = document.getElementById(`result-${sourceId}`);
+            if (resultElement) {
+                resultElement.remove();
+                showNotification('Item Removed.');
+            }
+
+            // Update currentSearchContext
+            if (currentSearchContext && currentSearchContext.results) {
+                currentSearchContext.results = currentSearchContext.results.filter(
+                    result => result.source_id != sourceId
+                );
+            }
         }
 
         function clearResults() {
@@ -1460,8 +1500,9 @@
             
             try {
                 // Send to Claude API with context
+
                 const response = await sendToClaude(message);
-                
+                hideChatLoading();
                 // Add Claude's response to history
                 const claudeMessage = {
                     role: 'assistant',
@@ -1559,6 +1600,12 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
+        function hideChatLoading() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const loadingElements = messagesContainer.querySelectorAll('.loading');
+            loadingElements.forEach(el => el.remove());
+        }
+
         function showChatLoading() {
             const messagesContainer = document.getElementById('chat-messages');
             const loadingElement = document.createElement('div');
@@ -1578,10 +1625,10 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             
             // Remove loading indicator after response
-            setTimeout(() => {
-                const loadingElements = messagesContainer.querySelectorAll('.loading');
-                loadingElements.forEach(el => el.remove());
-            }, 1000);
+            // setTimeout(() => {
+            //     const loadingElements = messagesContainer.querySelectorAll('.loading');
+            //     loadingElements.forEach(el => el.remove());
+            // }, 1000);
         }
 
         function showNotification(message) {
@@ -1600,11 +1647,16 @@
         }
         // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.action-dropdown')) {
-                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+            const clickedDropdownMenuName = "menu-" + e.target.id;
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu.id === clickedDropdownMenuName) {
+                // Toggle only the clicked one
+                    menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+                } else {
+                    // Close all others
                     menu.style.display = 'none';
+                }
                 });
-            }
         });
 
         // Close dropdowns on escape key
