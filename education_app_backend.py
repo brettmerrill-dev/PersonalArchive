@@ -480,7 +480,7 @@ class RAGSystem:
         session.add_message('user', query)
         
         # Prepare context text from search results
-        context_text = self._prepare_context_text(context.get("results", []))
+        context_text = self._prepare_context_text(context)
         
         # Get recent chat history
         recent_messages = session.get_recent_messages()
@@ -1143,6 +1143,7 @@ class RAGSystem:
                 4. The overall purpose/message of the content"""
         
         try:
+            
             headers = {
                 "Content-Type": "application/json",
                 "x-api-key": api_key,
@@ -1203,6 +1204,7 @@ def claude_chat():
         
         message = data.get('message', '').strip()
         context = data.get('context', {})
+        content = context.get("results", [])
         session_id = data.get('session_id', 'default')
         
         if not message:
@@ -1230,7 +1232,7 @@ def claude_chat():
             return jsonify({'error': 'Claude API key not configured'}), 400
         # Call Claude API
         response = rag_system.query_claude_b(
-            user.claude_api_key, message, context, session_id
+            user.claude_api_key, message, content, session_id
         )
         
         claude_response = response.get("response")
@@ -1508,103 +1510,111 @@ def archive():
 @app.route('/api/notesb', methods=['GET', 'POST'])
 #@requires_auth
 def handle_notesb():
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    # Get user and validate API key
-    user = User.query.get(user_id)
-    
-    if not user:
-        return {'error': 'User not found'}, 404
-    
-    if not user.claude_api_key:
-        return {'error': 'Claude API key not configured'}, 400
-    if request.method == 'GET':
+    try:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        # Get user and validate API key
+        user = User.query.get(user_id)
         
-        notes = Note.query.filter_by(user_id=user_id).order_by(Note.created_at.desc()).all()
-        return jsonify([{
-            'id': note.id,
-            'title': note.title,
-            'content': note.content,
-            'tags': json.loads(note.tags) if note.tags else [],
-            'subject': note.subject,
-            'priority': note.priority,
-            'is_todo': note.is_todo,
-            'is_completed': note.is_completed,
-            'due_date': note.due_date.isoformat() if note.due_date else None,
-            'created_at': note.created_at.isoformat()
-        } for note in notes])
-    
-    elif request.method == 'POST':
-        data = request.get_json()
-        message = f"""Summarize the contents of the document context for my note page. Return only the results needed for the note.
-            Remove any characters, just display some text from each source, if any. Add the entire chat context, if any. 
-            {data}
-        """
+        if not user:
+            return {'error': 'User not found'}, 404
         
-        session_id = 'default'
-        context = ""
+        if not user.claude_api_key:
+            return {'error': 'Claude API key not configured'}, 400
+        if request.method == 'GET':
+            
+            notes = Note.query.filter_by(user_id=user_id).order_by(Note.created_at.desc()).all()
+            return jsonify([{
+                'id': note.id,
+                'title': note.title,
+                'content': note.content,
+                'tags': json.loads(note.tags) if note.tags else [],
+                'subject': note.subject,
+                'priority': note.priority,
+                'is_todo': note.is_todo,
+                'is_completed': note.is_completed,
+                'due_date': note.due_date.isoformat() if note.due_date else None,
+                'created_at': note.created_at.isoformat()
+            } for note in notes])
         
-        result =  rag_system.query_claude_simple(user.claude_api_key, message)
-        # Update the description with Claude's response
-        if result:
-            # Extract just the response text, not the whole result dict
-            claude_response = result.get('response', '')
-            note = Note(
-                title=data.get('title'),
-                content=claude_response,
-                tags=json.dumps(data.get('tags', [])),
-                subject=data.get('subject'),
-                priority=data.get('priority', 'medium'),
-                is_todo=data.get('is_todo', False),
-                due_date=datetime.fromisoformat(data['due_date']) if data.get('due_date') else None,
-                user_id=user_id
-            )
+        elif request.method == 'POST':
+            data = request.get_json()
+            message = f"""Summarize the contents of the document context for my note page. Return only the results needed for the note.
+                Remove any characters, just display some text from each source, if any. Add the entire chat context, if any. 
+                {data}
+            """
             
-            db.session.add(note)
-            db.session.commit()
+            session_id = 'default'
+            context = ""
             
-            return jsonify({'success': True, 'id': note.id})
-            
-        else:
-            # Handle error case
-            return jsonify({
-                'success': False,
-                'error': result.get('error', 'Unknown error')
-            }), status_code
+            result =  rag_system.query_claude_simple(user.claude_api_key, message)
+            # Update the description with Claude's response
+            if result:
+                # Extract just the response text, not the whole result dict
+                claude_response = result.get('response', '')
+                note = Note(
+                    title=data.get('title'),
+                    content=claude_response,
+                    tags=json.dumps(data.get('tags', [])),
+                    subject=data.get('subject'),
+                    priority=data.get('priority', 'medium'),
+                    is_todo=data.get('is_todo', False),
+                    due_date=datetime.fromisoformat(data['due_date']) if data.get('due_date') else None,
+                    user_id=user_id
+                )
+                
+                db.session.add(note)
+                db.session.commit()
+                
+                return jsonify({'success': True, 'id': note.id})
+                
+            else:
+                # Handle error case
+                return jsonify({
+                    'success': False,
+                    'error': result.get('error', 'Unknown error')
+                }), 400
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
        
 
 @app.route('/api/notes/<int:note_id>', methods=['PUT','DELETE'])
 # @requires_auth
 def handle_note(note_id):
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    note = Note.query.filter_by(id=note_id, user_id=user_id).first()
-    
-    if not note:
-        return jsonify({'error': 'Note not found'}), 404
-    if request.method == 'PUT':
-        data = request.get_json()
-        note.title = data.get('title', note.title)
-        note.content = data.get('content', note.content)
-        note.tags = json.dumps(data.get('tags', json.loads(note.tags) if note.tags else []))
-        note.subject = data.get('subject', note.subject)
-        note.priority = data.get('priority', note.priority)
-        note.is_todo = data.get('is_todo', note.is_todo)
-        note.is_completed = data.get('is_completed', note.is_completed)
-        note.due_date = datetime.fromisoformat(data['due_date']) if data.get('due_date') else note.due_date
-        note.updated_at = datetime.utcnow()
+    try:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        note = Note.query.filter_by(id=note_id, user_id=user_id).first()
         
-        db.session.commit()
-        return jsonify({'success': True})
-    
-    elif request.method == 'DELETE':
-        db.session.delete(note)
-        db.session.commit()
-        return jsonify({'success': True})
+        if not note:
+            return jsonify({'error': 'Note not found'}), 404
+        if request.method == 'PUT':
+            data = request.get_json()
+            note.title = data.get('title', note.title)
+            note.content = data.get('content', note.content)
+            note.tags = json.dumps(data.get('tags', json.loads(note.tags) if note.tags else []))
+            note.subject = data.get('subject', note.subject)
+            note.priority = data.get('priority', note.priority)
+            note.is_todo = data.get('is_todo', note.is_todo)
+            note.is_completed = data.get('is_completed', note.is_completed)
+            note.due_date = datetime.fromisoformat(data['due_date']) if data.get('due_date') else note.due_date
+            note.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            return jsonify({'success': True})
+        
+        elif request.method == 'DELETE':
+            db.session.delete(note)
+            db.session.commit()
+            return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 def call_claude_with_file(user_id, message, file_id, session_id, context=""):
     """
@@ -1701,266 +1711,294 @@ def call_claude_with_file(user_id, message, file_id, session_id, context=""):
 @app.route('/api/files', methods=['GET', 'POST'])
 # @requires_auth
 def handle_files():
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    if request.method == 'GET':
-        files = File.query.filter_by(user_id=user_id).order_by(File.created_at.desc()).all()
-        return jsonify([{
-            'id': file.id,
-            'filename': file.original_filename,
-            'file_type': file.file_type,
-            'file_size': file.file_size,
-            'description': file.description,
-            'tags': json.loads(file.tags) if file.tags else [],
-            'subject': file.subject,
-            'created_at': file.created_at.isoformat()
-        } for file in files])
-    
-    elif request.method == 'POST':
-        if 'files' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+    try:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        if request.method == 'GET':
+            files = File.query.filter_by(user_id=user_id).order_by(File.created_at.desc()).all()
+            return jsonify([{
+                'id': file.id,
+                'filename': file.original_filename,
+                'file_type': file.file_type,
+                'file_size': file.file_size,
+                'description': file.description,
+                'tags': json.loads(file.tags) if file.tags else [],
+                'subject': file.subject,
+                'created_at': file.created_at.isoformat()
+            } for file in files])
         
-        file = request.files['files']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            # Add timestamp to avoid conflicts
-            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_')
-            filename = timestamp + filename
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
+        elif request.method == 'POST':
+            if 'files' not in request.files:
+                return jsonify({'error': 'No file provided'}), 400
             
-            # Create file record
-            file_record = File(
-                filename=filename,
-                original_filename=file.filename,
-                filepath=filepath,
-                file_type=file.filename.rsplit('.', 1)[1].lower(),
-                file_size=os.path.getsize(filepath),
-                description=request.form.get('description', ''),
-                tags=json.dumps(request.form.get('tags', '').split(',') if request.form.get('tags') else []),
-                subject=request.form.get('subject', ''),
-                user_id=user_id
-            )
-            db.session.add(file_record)
-            db.session.commit()
+            file = request.files['files']
+            if file.filename == '':
+                return jsonify({'error': 'No file selected'}), 400
             
-            available_files = ["txt", "pdf", '.md', 'py', 'js', 'html', 'css', 'json']
-            if file_record.file_type in available_files:
-                message = "Summarize the contents of the document context provided for academic purposes. I am a student continually learning."
-                file_id = file_record.id
-                session_id = 'default'
-                context = ""
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                # Add timestamp to avoid conflicts
+                timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_')
+                filename = timestamp + filename
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
                 
-                result, status_code = call_claude_with_file(
-                    user_id, message, file_id, session_id, context
+                # Create file record
+                file_record = File(
+                    filename=filename,
+                    original_filename=file.filename,
+                    filepath=filepath,
+                    file_type=file.filename.rsplit('.', 1)[1].lower(),
+                    file_size=os.path.getsize(filepath),
+                    description=request.form.get('description', ''),
+                    tags=json.dumps(request.form.get('tags', '').split(',') if request.form.get('tags') else []),
+                    subject=request.form.get('subject', ''),
+                    user_id=user_id
                 )
-                # Update the description with Claude's response
-                if status_code == 200:
-                    # Extract just the response text, not the whole result dict
-                    claude_response = result.get('response', '')
-                    file_record.description = claude_response
-                    db.session.commit()  # Save the updated description
+                db.session.add(file_record)
+                db.session.commit()
+                
+                available_files = ["txt", "pdf", '.md', 'py', 'js', 'html', 'css', 'json']
+                if file_record.file_type in available_files:
+                    message = "Summarize the contents of the document context provided for academic purposes. I am a student continually learning."
+                    file_id = file_record.id
+                    session_id = 'default'
+                    context = ""
                     
-                    return jsonify({
-                        'success': True, 
-                        'file_id': file_record.id
-                    }), status_code
+                    result, status_code = call_claude_with_file(
+                        user_id, message, file_id, session_id, context
+                    )
+                    # Update the description with Claude's response
+                    if status_code == 200:
+                        # Extract just the response text, not the whole result dict
+                        claude_response = result.get('response', '')
+                        file_record.description = claude_response
+                        db.session.commit()  # Save the updated description
+                        
+                        return jsonify({
+                            'success': True, 
+                            'file_id': file_record.id
+                        }), status_code
+                    else:
+                        # Handle error case
+                        return jsonify({
+                            'success': False,
+                            'error': result.get('error', 'Unknown error')
+                        }), status_code
+                # file_record.description = str(result)
+                
+                # print("result file read: ", result)
+                # return jsonify({'success': True, 'id': file_record.id})
                 else:
-                    # Handle error case
                     return jsonify({
-                        'success': False,
-                        'error': result.get('error', 'Unknown error')
-                    }), status_code
-            # file_record.description = str(result)
-            
-            # print("result file read: ", result)
-            # return jsonify({'success': True, 'id': file_record.id})
-            else:
-                return jsonify({
-                        'success': True, 
-                        'file_id': file_record.id
-                    }), 200
-        return jsonify({'error': 'Invalid file type'}), 400
+                            'success': True, 
+                            'file_id': file_record.id
+                        }), 200
+            return jsonify({'error': 'Invalid file type'}), 400
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/files/<int:file_id>/download')
 # @requires_auth
 def download_file(file_id):
-    token = request.headers.get('Authorization')
-    user_id = ""
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    file = File.query.filter_by(id=file_id, user_id=user_id).first()
-    if not file:
-        return jsonify({'error': 'File not found'}), 404
-    
-    return send_file(file.filepath, as_attachment=True, download_name=file.original_filename)
+    try:
+        token = request.headers.get('Authorization')
+        user_id = ""
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        file = File.query.filter_by(id=file_id, user_id=user_id).first()
+        if not file:
+            return jsonify({'error': 'File not found'}), 404
+        
+        return send_file(file.filepath, as_attachment=True, download_name=file.original_filename)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/files/<int:file_id>', methods=['DELETE'])
 # @requires_auth
 def delete_file(file_id):
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    file = File.query.filter_by(id=file_id, user_id=user_id).first()
-    if not file:
-        return jsonify({'error': 'File not found'}), 404
-    
-    # Delete physical file
-    if os.path.exists(file.filepath):
-        os.remove(file.filepath)
-    
-    db.session.delete(file)
-    db.session.commit()
-    
-    return jsonify({'success': True})
+    try:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        file = File.query.filter_by(id=file_id, user_id=user_id).first()
+        if not file:
+            return jsonify({'error': 'File not found'}), 404
+        
+        # Delete physical file
+        if os.path.exists(file.filepath):
+            os.remove(file.filepath)
+        
+        db.session.delete(file)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/links', methods=['GET', 'POST'])
 # @requires_auth
 def handle_links():
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    with app.app_context():    
-        user = User.query.get(user_id)
-        if not user.claude_api_key:
-            return jsonify({'error': 'Claude API key not configured'}), 400
-        if request.method == 'GET':
-            links = Link.query.filter_by(user_id=user_id).order_by(Link.created_at.desc()).all()
-            return jsonify([{
-                'id': link.id,
-                'url': link.url,
-                'title': link.title,
-                'description': link.description,
-                'favicon': link.favicon,
-                'tags': json.loads(link.tags) if link.tags else [],
-                'subject': link.subject,
-                'created_at': link.created_at.isoformat()
-            } for link in links])
-        
-        elif request.method == 'POST':
-            data = request.get_json()
-            url = data.get('url')
+    try:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        with app.app_context():    
+            user = User.query.get(user_id)
+            if not user.claude_api_key:
+                return jsonify({'error': 'Claude API key not configured'}), 400
+            if request.method == 'GET':
+                links = Link.query.filter_by(user_id=user_id).order_by(Link.created_at.desc()).all()
+                return jsonify([{
+                    'id': link.id,
+                    'url': link.url,
+                    'title': link.title,
+                    'description': link.description,
+                    'favicon': link.favicon,
+                    'tags': json.loads(link.tags) if link.tags else [],
+                    'subject': link.subject,
+                    'created_at': link.created_at.isoformat()
+                } for link in links])
             
-            if not url:
-                return jsonify({'error': 'URL is required'}), 400
-            
-            # Extract metadata
-            metadata = extract_metadata_from_url(url)
-            
-            # Example 2: Just summarize a URL
-            summary = rag_system.summarize_url(
-                api_key=user.claude_api_key,
-                url=url,
-                focus_query="Educational questions and pages only."
-            )
-            print("SUMMARY OF URL: ", summary)
-            
-            description_str = data.get('description', metadata['description'])
-            joined_description = f"""{description_str}
-                    Claude Summary: 
-                    
-                    {summary.get('response')}"""
+            elif request.method == 'POST':
+                data = request.get_json()
+                url = data.get('url')
+                
+                if not url:
+                    return jsonify({'error': 'URL is required'}), 400
+                
+                # Extract metadata
+                metadata = extract_metadata_from_url(url)
+                print("user", user.claude_api_key)
+                # Example 2: Just summarize a URL
+                summary = rag_system.summarize_url(
+                    api_key=user.claude_api_key,
+                    url=url,
+                    focus_query="Educational questions and pages only."
+                )
+                print("SUMMARY OF URL: ", summary)
+                
+                description_str = data.get('description', metadata['description'])
+                joined_description = f"""{description_str}
+                        Claude Summary: 
+                        
+                        {summary.get('response')}"""
 
-            link = Link(
-                url=url,
-                title=data.get('title', metadata['title']),
-                description=joined_description,
-                favicon=metadata['favicon'],
-                tags=json.dumps(data.get('tags', [])),
-                subject=data.get('subject', ''),
-                user_id=user_id
-            )
-            
-            db.session.add(link)
-            db.session.commit()
-            
-            return jsonify({'success': True, 'id': link.id})
+                link = Link(
+                    url=url,
+                    title=data.get('title', metadata['title']),
+                    description=joined_description,
+                    favicon=metadata['favicon'],
+                    tags=json.dumps(data.get('tags', [])),
+                    subject=data.get('subject', ''),
+                    user_id=user_id
+                )
+                
+                db.session.add(link)
+                db.session.commit()
+                
+                return jsonify({'success': True, 'id': link.id})
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/links/<int:link_id>', methods=['DELETE'])
 #@requires_auth
 def delete_link(link_id):
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    link = Link.query.filter_by(id=link_id, user_id=user_id).first()
-    if not link:
-        return jsonify({'error': 'Link not found'}), 404
-    
-    db.session.delete(link)
-    db.session.commit()
-    
-    return jsonify({'success': True})
+    try:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        link = Link.query.filter_by(id=link_id, user_id=user_id).first()
+        if not link:
+            return jsonify({'error': 'Link not found'}), 404
+        
+        db.session.delete(link)
+        db.session.commit()
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/search', methods=['POST'])
 #@requires_auth
 def search():
-    data = request.get_json()
-    query = data.get('query', '')
-    filters = data.get('filters', {})
-    # Extract content types based on filters sent
-    content_types = []
-    for key in ['notes', 'files', 'links']:
-        if filters.get(key):
-            content_types.append(key)
-    token = request.headers.get('Authorization')
-    user_id = ""
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    if not query:
-        return jsonify({'error': 'Query is required'}), 400
-    user = User.query.get(user_id)
-    if not user.claude_api_key:
-        return jsonify({'error': 'Claude API key not configured'}), 400
+    try:
+        data = request.get_json()
+        query = data.get('query', '')
+        filters = data.get('filters', {})
+        # Extract content types based on filters sent
+        content_types = []
+        for key in ['notes', 'files', 'links']:
+            if filters.get(key):
+                content_types.append(key)
+        token = request.headers.get('Authorization')
+        user_id = ""
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        if not query:
+            return jsonify({'error': 'Query is required'}), 400
+        user = User.query.get(user_id)
+        if not user.claude_api_key:
+            return jsonify({'error': 'Claude API key not configured'}), 400
 
-    results = rag_system.search_content(user.claude_api_key, user_id, query, content_types)
-    
-    return jsonify([{
-        'content': result.content,
-        'source_type': result.source_type,
-        'source_id': result.source_id,
-        'title': result.title,
-        'relevance_score': result.relevance_score,
-        'created_at': result.created_at.isoformat()
-    } for result in results])
+        results = rag_system.search_content(user.claude_api_key, user_id, query, content_types)
+        
+        return jsonify([{
+            'content': result.content,
+            'source_type': result.source_type,
+            'source_id': result.source_id,
+            'title': result.title,
+            'relevance_score': result.relevance_score,
+            'created_at': result.created_at.isoformat()
+        } for result in results])
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/claude-query', methods=['POST'])
 #@requires_auth
 def claude_query():
-    data = request.get_json()
-    query = data.get('query', '')
-    token = request.headers.get('Authorization')
-    user_id = ""
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    if not query:
-        return jsonify({'error': 'Query is required'}), 400
-    
-    user = User.query.get(user_id)
-    if not user.claude_api_key:
-        return jsonify({'error': 'Claude API key not configured'}), 400
-    
-    # Search for relevant content
-    results = rag_system.search_content(user.claude_api_key, user_id, query)
-    
-    # Query Claude with context
-    response = rag_system.query_claude(user.claude_api_key, query, results)
-    
-    return jsonify({
-        'response': response,
-        'context_sources': [result.title
-        for result in results]
-    })
+    try:
+        data = request.get_json()
+        query = data.get('query', '')
+        token = request.headers.get('Authorization')
+        user_id = ""
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        if not query:
+            return jsonify({'error': 'Query is required'}), 400
+        
+        user = User.query.get(user_id)
+        if not user.claude_api_key:
+            return jsonify({'error': 'Claude API key not configured'}), 400
+        
+        # Search for relevant content
+        results = rag_system.search_content(user.claude_api_key, user_id, query)
+        
+        # Query Claude with context
+        response = rag_system.query_claude(user.claude_api_key, query, results)
+        
+        return jsonify({
+            'response': response,
+            'context_sources': [result.title
+            for result in results]
+        }), 200
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 # Routes
 @app.route('/api/register', methods=['POST'])
@@ -2088,68 +2126,76 @@ def login():
 @app.route('/api/settings', methods=['GET', 'POST'])
 #@requires_auth
 def handle_settings():
-    token = request.headers.get('Authorization')
-    user_id = ""
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    user = User.query.get(user_id)
-    
-    if request.method == 'GET':
-        return jsonify({
-            'username': user.username,
-            'email': user.email,
-            'has_claude_api_key': bool(user.claude_api_key)
-        })
-    
-    elif request.method == 'POST':
-        data = request.get_json()
+    try:
+        token = request.headers.get('Authorization')
+        user_id = ""
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        user = User.query.get(user_id)
         
-        if 'claude_api_key' in data:
-            user.claude_api_key = data.get('claude_api_key')
+        if request.method == 'GET':
+            return jsonify({
+                'username': user.username,
+                'email': user.email,
+                'has_claude_api_key': bool(user.claude_api_key)
+            })
         
-        db.session.commit()
-        return jsonify({'success': True})
+        elif request.method == 'POST':
+            data = request.get_json()
+            
+            if 'claude_api_key' in data:
+                user.claude_api_key = data.get('claude_api_key')
+            
+            db.session.commit()
+            return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500    
 
 @app.route('/api/dashboard-stats')
 #@requires_auth
 def dashboard_stats():
-    token = request.headers.get('Authorization')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        user_id = verify_token_b(token)
-    # Get counts
-    notes_count = Note.query.filter_by(user_id=user_id).count()
-    files_count = File.query.filter_by(user_id=user_id).count()
-    links_count = Link.query.filter_by(user_id=user_id).count()
-    
-    # Get todos
-    todos = Note.query.filter_by(user_id=user_id, is_todo=True, is_completed=False).all()
-    
-    # Get recent activity
-    recent_notes = Note.query.filter_by(user_id=user_id).order_by(Note.created_at.desc()).limit(5).all()
-    recent_files = File.query.filter_by(user_id=user_id).order_by(File.created_at.desc()).limit(5).all()
-    recent_links = Link.query.filter_by(user_id=user_id).order_by(Link.created_at.desc()).limit(5).all()
-    
-    return jsonify({
-        'counts': {
-            'notes': notes_count,
-            'files': files_count,
-            'links': links_count,
-            'todos': len(todos)
-        },
-        'todos': [{
-            'id': todo.id,
-            'title': todo.title,
-            'due_date': todo.due_date.isoformat() if todo.due_date else None,
-            'priority': todo.priority
-        } for todo in todos],
-        'recent_activity': {
-            'notes': [{'id': n.id, 'title': n.title, 'created_at': n.created_at.isoformat()} for n in recent_notes],
-            'files': [{'id': f.id, 'title': f.original_filename, 'created_at': f.created_at.isoformat()} for f in recent_files],
-            'links': [{'id': l.id, 'title': l.title, 'created_at': l.created_at.isoformat()} for l in recent_links]
-        }
-    })
+    try:
+        token = request.headers.get('Authorization')
+        if token and token.startswith('Bearer '):
+            token = token.split(' ')[1]
+            user_id = verify_token_b(token)
+        # Get counts
+        notes_count = Note.query.filter_by(user_id=user_id).count()
+        files_count = File.query.filter_by(user_id=user_id).count()
+        links_count = Link.query.filter_by(user_id=user_id).count()
+        
+        # Get todos
+        todos = Note.query.filter_by(user_id=user_id, is_todo=True, is_completed=False).all()
+        
+        # Get recent activity
+        recent_notes = Note.query.filter_by(user_id=user_id).order_by(Note.created_at.desc()).limit(5).all()
+        recent_files = File.query.filter_by(user_id=user_id).order_by(File.created_at.desc()).limit(5).all()
+        recent_links = Link.query.filter_by(user_id=user_id).order_by(Link.created_at.desc()).limit(5).all()
+        
+        return jsonify({
+            'counts': {
+                'notes': notes_count,
+                'files': files_count,
+                'links': links_count,
+                'todos': len(todos)
+            },
+            'todos': [{
+                'id': todo.id,
+                'title': todo.title,
+                'due_date': todo.due_date.isoformat() if todo.due_date else None,
+                'priority': todo.priority
+            } for todo in todos],
+            'recent_activity': {
+                'notes': [{'id': n.id, 'title': n.title, 'created_at': n.created_at.isoformat()} for n in recent_notes],
+                'files': [{'id': f.id, 'title': f.original_filename, 'created_at': f.created_at.isoformat()} for f in recent_files],
+                'links': [{'id': l.id, 'title': l.title, 'created_at': l.created_at.isoformat()} for l in recent_links]
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 # Initialize database
 
