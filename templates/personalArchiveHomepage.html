@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <title>Student Personal Archive</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles/ragstyles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>📚 Student Personal Archive</h1>
+                <nav class="nav">
+                    <button class="nav-btn active" data-section="search">Search</button>
+                    <button class="nav-btn" data-section="notes">Notes</button>
+                    <button class="nav-btn" data-section="files">Files</button>
+                    <button class="nav-btn" data-section="links">Links</button>
+                    <button class="nav-btn" data-section="settings">Settings</button>
+                </nav>
+                <div class="user-info">
+                    <span id="username"></span>
+                    <button id="logout-btn">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Search Section -->
+            <section id="search-section" class="section active">
+                <div class="search-container">
+                    <h2>🔍 Search Your Archive</h2>
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="Ask me anything about your notes, files, or links..." />
+                        <button id="search-btn">Search</button>
+                        <button id="claude-query-btn">Ask Claude</button>
+                    </div>
+                    <div class="search-filters">
+                        <label>
+                            <input type="checkbox" id="search-notes" checked> Notes
+                        </label>
+                        <label>
+                            <input type="checkbox" id="search-files" checked> Files
+                        </label>
+                        <label>
+                            <input type="checkbox" id="search-links" checked> Links
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="results-container">
+                    <div id="search-results" class="results-grid"></div>
+                    <div id="claude-response" class="claude-response hidden"></div>
+                </div>
+            </section>
+
+            <!-- Notes Section -->
+            <section id="notes-section" class="section">
+                <div class="section-header">
+                    <h2>📝 Notes</h2>
+                    <button id="add-note-btn" class="add-btn">Add Note</button>
+                </div>
+                <div class="content-grid" id="notes-grid"></div>
+            </section>
+
+            <!-- Files Section -->
+            <section id="files-section" class="section">
+                <div class="section-header">
+                    <h2>📁 Files</h2>
+                    <div class="file-upload-area">
+                        <input type="file" id="file-input" multiple>
+                        <button id="upload-btn">Upload Files</button>
+                    </div>
+                </div>
+                <div class="content-grid" id="files-grid"></div>
+            </section>
+
+            <!-- Links Section -->
+            <section id="links-section" class="section">
+                <div class="section-header">
+                    <h2>🔗 Links</h2>
+                    <button id="add-link-btn" class="add-btn">Add Link</button>
+                </div>
+                <div class="content-grid" id="links-grid"></div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings-section" class="section">
+                <div class="settings-container">
+                    <h2>⚙️ Settings</h2>
+                    <div class="settings-form">
+                        <div class="form-group">
+                            <label for="claude-api-key">Claude API Key:</label>
+                            <input type="password" id="claude-api-key" placeholder="Enter your Claude API key">
+                            <button id="save-api-key">Save</button>
+                        </div>
+                        <div class="api-key-status" id="api-key-status"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modals -->
+        <!-- Note Modal -->
+        <div id="note-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3 id="note-modal-title">Add Note</h3>
+                <form id="note-form">
+                    <input type="hidden" id="note-id">
+                    <div class="form-group">
+                        <label for="note-title">Title:</label>
+                        <input type="text" id="note-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="note-content">Content:</label>
+                        <textarea id="note-content" rows="6" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="note-subject">Subject:</label>
+                        <input type="text" id="note-subject">
+                    </div>
+                    <div class="form-group">
+                        <label for="note-tags">Tags (comma-separated):</label>
+                        <input type="text" id="note-tags">
+                    </div>
+                    <div class="form-group">
+                        <label for="note-priority">Priority:</label>
+                        <select id="note-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <!-- <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="note-is-todo"> Is Todo
+                        </label>
+                    </div> -->
+                    <div class="form-group" id="due-date-group" style="display: none;">
+                        <label for="note-due-date">Due Date:</label>
+                        <input type="datetime-local" id="note-due-date">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit">Save Note</button>
+                        <button type="button" id="cancel-note">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Link Modal -->
+        <div id="link-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3 id="link-modal-title">Add Link</h3>
+                <form id="link-form">
+                    <input type="hidden" id="link-id">
+                    <div class="form-group">
+                        <label for="link-url">URL:</label>
+                        <input type="url" id="link-url" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="link-title">Title:</label>
+                        <input type="text" id="link-title">
+                    </div>
+                    <div class="form-group">
+                        <label for="link-description">Description:</label>
+                        <textarea id="link-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="link-tags">Tags (comma-separated):</label>
+                        <input type="text" id="link-tags">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit">Save Link</button>
+                        <button type="button" id="cancel-link">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentUser = null;
+        let currentSection = 'search';
+        let originalClaudeResponse = '';
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', function() {
+            // checkAuth();
+            initializeEventListeners();
+            loadDashboard();
+        });
+
+        // // Authentication check
+        // function checkAuth() {
+        //     fetch('/api/user')
+        //         .then(response => {
+        //             if (!response.ok) {
+        //                 window.location.href = '/login';
+        //                 return;
+        //             }
+        //             return response.json();
+        //         })
+        //         .then(data => {
+        //             if (data) {
+        //                 currentUser = data;
+        //                 document.getElementById('username').textContent = data.username;
+        //             }
+        //         })
+        //         .catch(error => {
+        //             console.error('Auth check failed:', error);
+        //             window.location.href = '/login';
+        //         });
+        // }
+
+        // Initialize event listeners
+        function initializeEventListeners() {
+            // Navigation
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', () => switchSection(btn.dataset.section));
+            });
+
+            // Search functionality
+            document.getElementById('search-btn').addEventListener('click', performSearch);
+            document.getElementById('claude-query-btn').addEventListener('click', askClaude);
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') performSearch();
+            });
+
+            // Note management
+            document.getElementById('add-note-btn').addEventListener('click', () => openNoteModal());
+            document.getElementById('note-form').addEventListener('submit', saveNote);
+            document.getElementById('cancel-note').addEventListener('click', closeNoteModal);
+            // document.getElementById('note-is-todo').addEventListener('change', toggleDueDateField);
+
+            // File management
+            document.getElementById('upload-btn').addEventListener('click', uploadFiles);
+
+            // Link management
+            document.getElementById('add-link-btn').addEventListener('click', () => openLinkModal());
+            document.getElementById('link-form').addEventListener('submit', saveLink);
+            document.getElementById('cancel-link').addEventListener('click', closeLinkModal);
+
+            // Settings
+            document.getElementById('save-api-key').addEventListener('click', saveApiKey);
+
+            // Logout
+            document.getElementById('logout-btn').addEventListener('click', logout);
+
+            // Modal close buttons
+            document.querySelectorAll('.close').forEach(closeBtn => {
+                closeBtn.addEventListener('click', closeModals);
+            });
+        }
+
+        // Section switching
+        function switchSection(section) {
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+            
+            document.querySelector(`[data-section="${section}"]`).classList.add('active');
+            document.getElementById(`${section}-section`).classList.add('active');
+            
+            currentSection = section;
+            
+            // Load section-specific data
+            switch(section) {
+                case 'notes':
+                    loadNotes();
+                    break;
+                case 'files':
+                    loadFiles();
+                    break;
+                case 'links':
+                    loadLinks();
+                    break;
+                case 'settings':
+                    loadSettings();
+                    break;
+            }
+        }
+
+        // Search functionality
+        function performSearch() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+
+            const filters = {
+                notes: document.getElementById('search-notes').checked,
+                files: document.getElementById('search-files').checked,
+                links: document.getElementById('search-links').checked
+            };
+            hideClaudeResponse();
+            showLoading();
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/search', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': token_str},
+                body: JSON.stringify({query, filters})
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                displaySearchResults(data);
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Search failed:', error);
+                showError('Search failed. Please try again.');
+            });
+        }
+
+        function askClaude() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return;
+            hideSearchResults();
+            showLoading();
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/claude-query', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': token_str},
+                body: JSON.stringify({query})
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    displayClaudeResponse(data);
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Claude query failed:', error);
+                showError('Claude query failed. Please check your API key.');
+            });
+        }
+
+        function displaySearchResults_b(results) {
+            const container = document.getElementById('search-results');
+            const claudeContainer = document.getElementById('claude-response');
+            
+            claudeContainer.classList.add('hidden');
+            container.innerHTML = '';
+
+            if (results.length === 0) {
+                container.innerHTML = '<p class="no-results">No results found.</p>';
+                return;
+            }
+
+            results.forEach(result => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'search-result';
+                
+                let typeIcon = '';
+                switch(result.type) {
+                    case 'note': typeIcon = '📝'; break;
+                    case 'file': typeIcon = '📁'; break;
+                    case 'link': typeIcon = '🔗'; break;
+                }
+
+                resultElement.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-type">${typeIcon} ${result.type}</span>
+                        <span class="result-score">Score: ${result.score.toFixed(2)}</span>
+                    </div>
+                    <h3>${result.title}</h3>
+                    <p>${result.content}</p>
+                    <div class="result-meta">
+                        ${result.tags ? `<span class="tags">${result.tags.join(', ')}</span>` : ''}
+                        <span class="date">${new Date(result.created_at).toLocaleDateString()}</span>
+                    </div>
+                `;
+                
+                container.appendChild(resultElement);
+            });
+        }
+
+        function hideSearchResults() {
+            const container = document.getElementById('search-results');
+            const claudeContainer = document.getElementById('claude-response');
+            
+            container.innerHTML = '';
+            // Optionally show the Claude container if it was hidden by search
+            // claudeContainer.classList.remove('hidden');
+        }
+
+        function displayClaudeResponse(response) {
+            
+            const container = document.getElementById('claude-response');
+            const searchResults = document.getElementById('search-results');
+            originalClaudeResponse = response.response;
+            searchResults.innerHTML = '';
+            container.classList.remove('hidden');
+            
+            container.innerHTML = `
+                
+                <div class="claude-header">
+                    <h3>🤖 Claude's Response</h3>
+                    <div class="action-buttons">
+                    <button onclick="saveClaudeResults()" class="btn btn-primary">
+                        <span class="icon">💾</span> Save Results
+                    </button>
+                </div>
+                </div>
+                <div class="claude-content">
+                    ${formatMessageContent(response.response)}
+                </div>
+                <div class="claude-context">
+                    <h4>Based on ${response.context_sources} pieces of your content</h4>
+                </div>
+            `;
+        }
+
+        function hideClaudeResponse() {
+            const container = document.getElementById('claude-response');
+            const searchResults = document.getElementById('search-results');
+            
+            container.classList.add('hidden');
+            container.innerHTML = '';
+            searchResults.innerHTML = '';
+        }
+
+
+        // Notes management
+        function loadNotes() {
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/notesb', {headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                .then(response => response.json())
+                .then(notes => {
+                    const container = document.getElementById('notes-grid');
+                    container.innerHTML = '';
+                    
+                    notes.forEach(note => {
+                        const noteElement = createNoteElement(note);
+                        container.appendChild(noteElement);
+                    });
+                })
+                .catch(error => console.error('Failed to load notes:', error));
+        }
+        function toggleDropdown(button) {
+            const dropdownMenu = button.nextElementSibling;
+            
+            // Close all other dropdowns first
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu !== dropdownMenu) {
+                    menu.style.display = 'none';
+                }
+            });
+            
+            // Toggle the current dropdown
+            if (dropdownMenu.style.display === 'none' || dropdownMenu.style.display === '') {
+                dropdownMenu.style.display = 'block';
+            } else {
+                dropdownMenu.style.display = 'none';
+            }
+        }
+        function createNoteElement(note) {
+            const div = document.createElement('div');
+            div.className = 'content-item note-item';
+            
+            const priorityClass = `priority-${note.priority}`;
+            const todoStatus = note.is_todo ? (note.is_completed ? 'completed' : 'pending') : '';
+            
+            div.innerHTML = `
+                <div class="item-header">
+                    <h4>${note.title}</h4>
+                    <div class="item-actions">
+                        <button class="dropdown-item delete-item" onclick="deleteNote(${note.id})">Delete</button>
+                    </div>
+                </div>
+                
+                <div class="description-container">
+                    <div class="description-content" id="note-${note.id}">
+                        <div class="description-fade"></div>
+                        ${formatMessageContent(note.content)}
+                    </div>
+                    <button class="description-toggle" onclick="toggleDescription('note-${note.id}')">
+                        <span>Show more</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="item-meta">
+                    <span class="priority ${priorityClass}">${note.priority}</span>
+                    ${note.subject ? `<span class="subject">${note.subject}</span>` : ''}
+                    ${note.is_todo ? `<span class="todo-status ${todoStatus}">${todoStatus}</span>` : ''}
+                    ${note.due_date ? `<span class="due-date">Due: ${new Date(note.due_date).toLocaleDateString()}</span>` : ''}
+                </div>
+
+                ${note.tags ? `<div class="tags">${note.tags.join(', ')}</div>` : ''}
+            `;
+            return div;
+        }
+
+       
+
+
+        function openNoteModal(note = null) {
+            const modal = document.getElementById('note-modal');
+            const title = document.getElementById('note-modal-title');
+            const form = document.getElementById('note-form');
+            
+            if (note) {
+                title.textContent = 'Edit Note';
+                populateNoteForm(note);
+            } else {
+                title.textContent = 'Add Note';
+                form.reset();
+                document.getElementById('note-id').value = '';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        function populateNoteForm(note) {
+            document.getElementById('note-id').value = note.id;
+            document.getElementById('note-title').value = note.title;
+            document.getElementById('note-content').value = note.content;
+            document.getElementById('note-subject').value = note.subject || '';
+            document.getElementById('note-tags').value = note.tags ? note.tags.join(', ') : '';
+            document.getElementById('note-priority').value = note.priority;
+            // document.getElementById('note-is-todo').checked = note.is_todo;
+            // document.getElementById('note-due-date').value = note.due_date ? note.due_date.slice(0, 16) : '';
+            
+            // toggleDueDateField();
+        }
+
+        function saveNote(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const noteData = {
+                title: document.getElementById('note-title').value,
+                content: document.getElementById('note-content').value,
+                subject: document.getElementById('note-subject').value,
+                tags: document.getElementById('note-tags').value.split(',').map(t => t.trim()).filter(t => t),
+                priority: document.getElementById('note-priority').value,
+                // is_todo: document.getElementById('note-is-todo').checked,
+                is_todo: false,
+                due_date: document.getElementById('note-due-date').value || null
+            };
+
+            const noteId = document.getElementById('note-id').value;
+            const method = noteId ? 'PUT' : 'POST';
+            const url = noteId ? `/api/notes/${noteId}` : '/api/notesb';
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            showLoading();
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json', 'Authorization': token_str},
+                body: JSON.stringify(noteData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    document.getElementById('claude-api-key').value = '';
+                    loadSettings();
+                    hideLoading();
+                    showSuccess('Note saved successfully!');
+                    closeNoteModal();
+                    
+                }
+            })
+            .catch(error => {
+                console.error('Failed to save API key:', error);
+                showError('Failed to save API key.');
+            });
+        }
+
+        // Dashboard
+        function loadDashboard() {
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/dashboard-stats',{headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                .then(response => response.json())
+                .then(stats => {
+                    // You can use these stats to show dashboard info if needed
+                    console.log('Dashboard stats:', stats);
+                })
+                .catch(error => console.error('Failed to load dashboard stats:', error));
+        }
+
+        // Utility functions
+        function showLoading() {
+            document.getElementById('loading').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.add('hidden');
+        }
+
+        function showError(message) {
+            // Create a temporary error notification
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'notification error';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            // Create a temporary success notification
+            const successDiv = document.createElement('div');
+            successDiv.className = 'notification success';
+            successDiv.textContent = message;
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+                successDiv.remove();
+            }, 3000);
+        }
+
+        function closeModals() {
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.style.display = 'none';
+            });
+        }
+
+        function logout() {
+            fetch('/logout', {method: 'POST'})
+                .then(() => {
+                    window.location.href = '/login';
+                })
+                .catch(error => {
+                    console.error('Logout failed:', error);
+                    window.location.href = '/login';
+                });
+        }
+
+        function editNote(note) {
+            openNoteModal(note)
+        }
+
+        function deleteNote(noteId) {
+            if (confirm('Are you sure you want to delete this note?')) {
+                const token = localStorage.getItem('token');
+                const token_str = 'Bearer ' + token;
+                fetch(`/api/notes/${noteId}`, {method: 'DELETE', headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            showError(data.error);
+                        } else {
+                            loadNotes();
+                            showSuccess('Note deleted successfully!');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Failed to delete note:', error);
+                        showError('Failed to delete note.');
+                    });
+            }
+        }
+
+        // function toggleDueDateField() {
+        //     const checkbox = document.getElementById('note-is-todo');
+        //     const dueDateGroup = document.getElementById('due-date-group');
+        //     dueDateGroup.style.display = checkbox.checked ? 'block' : 'none';
+        // }
+
+        function closeNoteModal() {
+            document.getElementById('note-modal').style.display = 'none';
+        }
+
+        // Files management
+        function loadFiles() {
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/files', {headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                .then(response => response.json())
+                .then(files => {
+                    const container = document.getElementById('files-grid');
+                    container.innerHTML = '';
+                    
+                    files.forEach(file => {
+                        const fileElement = createFileElement(file);
+                        container.appendChild(fileElement);
+                    });
+                })
+                .catch(error => console.error('Failed to load files:', error));
+        }
+        function formatMessageContent(content, role) {
+            if (role === 'user') {
+                // Simple formatting for user messages
+                return escapeHtml(content);
+            }
+            
+            // Enhanced formatting for Claude's responses
+            let formatted = content;
+            
+            // Convert markdown-style formatting to HTML
+            formatted = convertMarkdownToHtml(formatted);
+            
+            // Add proper paragraph structure
+            formatted = structureParagraphs(formatted);
+            
+            return formatted;
+        }
+
+        function convertMarkdownToHtml(text) {
+            // Convert headers
+            text = text.replace(/^### (.*$)/gm, '<h4>$1</h4>');
+            text = text.replace(/^## (.*$)/gm, '<h3>$1</h3>');
+            text = text.replace(/^# (.*$)/gm, '<h2>$1</h2>');
+            
+            // Convert bold text
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/__(.*?)__/g, '<strong>$1</strong>');
+            
+            // Convert italic text
+            text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            text = text.replace(/_(.*?)_/g, '<em>$1</em>');
+            
+            // Convert bullet points
+            text = text.replace(/^\* (.*$)/gm, '<li>$1</li>');
+            text = text.replace(/^- (.*$)/gm, '<li>$1</li>');
+            
+            // Convert numbered lists
+            text = text.replace(/^\d+\. (.*$)/gm, '<li class="numbered">$1</li>');
+            
+            // Wrap consecutive list items in ul/ol tags
+            text = wrapListItems(text);
+            
+            // Convert code blocks
+            text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            
+            // Convert inline code
+            text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Convert links (basic)
+            text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+            
+            // Convert line breaks to proper HTML
+            text = text.replace(/\n\n/g, '</p><p>');
+            text = text.replace(/\n/g, '<br>');
+            
+            return text;
+        }
+
+        function wrapListItems(text) {
+            // Wrap regular bullet points in <ul>
+            text = text.replace(/(<li>.*?<\/li>(?:\s*<li>.*?<\/li>)*)/gs, '<ul>$1</ul>');
+            
+            // Wrap numbered items in <ol>
+            text = text.replace(/(<li class="numbered">.*?<\/li>(?:\s*<li class="numbered">.*?<\/li>)*)/gs, '<ol>$1</ol>');
+            
+            // Clean up numbered class in ol
+            text = text.replace(/<ol>(.*?)<\/ol>/gs, function(match, content) {
+                return '<ol>' + content.replace(/class="numbered"/g, '') + '</ol>';
+            });
+            
+            return text;
+        }
+
+        function structureParagraphs(text) {
+            // Split into paragraphs and add proper structure
+            const paragraphs = text.split(/\n\s*\n/);
+            const structured = paragraphs.map(paragraph => {
+                paragraph = paragraph.trim();
+                if (!paragraph) return '';
+                
+                // Don't wrap if it's already a block element
+                if (paragraph.match(/^<(h[1-6]|ul|ol|pre|blockquote)/)) {
+                    return paragraph;
+                }
+                
+                // Wrap in paragraph tags
+                return `<p>${paragraph}</p>`;
+            }).join('');
+            
+            return structured;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function createFileElement(file) {
+            const div = document.createElement('div');
+            div.className = 'content-item file-item';
+            
+            const fileIcon = getFileIcon(file.file_type);
+            // <div class="item-actions">
+            //             <button onclick="downloadFile(${file.id})">Download</button>
+            //             <button onclick="deleteFile(${file.id})">Delete</button>
+            //         </div>
+            div.innerHTML = `
+                <div class="item-header">
+                    <h4>${fileIcon} ${file.filename}</h4>
+                    <div class="dropdown" style="margin-bottom: 2vh;">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="actionDropdown-${file.id}" data-bs-toggle="dropdown" aria-expanded="false">
+                            &#8942;
+                        </button>
+                    
+                        <!-- Dropdown Menu -->
+                        <ul class="dropdown-menu dropdown-menu dropdown-menu-end" id="menu-actionDropdown-${file.id}" aria-labelledby="actionDropdown-${file.id}">
+                            <li> <button onclick="downloadFile(${file.id})" class="dropdown-valve-item dropdown-item btn w-100 text-black">Download</button></li>
+                            <li><button onclick="deleteFile(${file.id})" class="dropdown-item btn btn-success w-100 text-black">Delete</button></li>
+                        </ul>
+                    </div>
+                    
+                </div>
+                <div class="item-meta">
+                    <div class="description-container">
+                        <div class="description-content" id="description-${file.id}">
+                            <div class="description-fade"></div>
+                            ${formatMessageContent(file.description)}
+                        </div>
+                        <button class="description-toggle" onclick="toggleDescription('description-${file.id}')">
+                            <span>Show more</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                    </div>
+                    <span class="file-size">${formatFileSize(file.file_size)}</span>
+                    <span class="upload-date">${new Date(file.created_at).toLocaleDateString()}</span>
+                </div>
+                ${file.tags ? `<div class="tags">${file.tags.join(', ')}</div>` : ''}
+            `;
+            
+            return div;
+        }
+        function toggleDescription(elementId) {
+            const content = document.getElementById(elementId);
+            const button = content.nextElementSibling;
+            const buttonText = button.querySelector('span');
+            
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                buttonText.textContent = 'Show more';
+            } else {
+                content.classList.add('expanded');
+                buttonText.textContent = 'Show less';
+            }
+        }
+
+        function getFileIcon(contentType) {
+            if (contentType.includes('image')) return '🖼️';
+            if (contentType.includes('pdf')) return '📄';
+            if (contentType.includes('word')) return '📝';
+            if (contentType.includes('txt')) return '📄';
+            return '📁';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function uploadFiles() {
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                showError('Please select files to upload.');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            showLoading();
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/files', {
+                method: 'POST',
+                headers: {'Authorization': token_str},
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    loadFiles();
+                    showSuccess(`${files.length} file(s) uploaded successfully!`);
+                    fileInput.value = '';
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Failed to upload files:', error);
+                showError('Failed to upload files.');
+            });
+        }
+
+        function downloadFile_old(fileId) {
+            window.open(`/api/files/${fileId}/download`, '_blank');
+        }
+        async function downloadFile(fileId) {
+            try {
+                const token = localStorage.getItem('token');
+                const token_str = 'Bearer ' + token;
+                const response = await fetch(`/api/files/${fileId}/download`, {
+                    headers: {
+                        'Authorization': token_str
+                    }
+                });
+                
+                if (!response.ok) throw new Error('Download failed');
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || `file-${fileId}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Download failed:', error);
+                showError('Download failed');
+            }
+        }
+
+        function deleteFile(fileId) {
+            if (confirm('Are you sure you want to delete this file?')) {
+                const token = localStorage.getItem('token');
+                const token_str = 'Bearer ' + token;
+                fetch(`/api/files/${fileId}`, {method: 'DELETE', headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            showError(data.error);
+                        } else {
+                            loadFiles();
+                            showSuccess('File deleted successfully!');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Failed to delete file:', error);
+                        showError('Failed to delete file.');
+                    });
+            }
+        }
+
+        // Links management
+        function loadLinks() {
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/links', {headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                .then(response => response.json())
+                .then(links => {
+                    const container = document.getElementById('links-grid');
+                    container.innerHTML = '';
+                    
+                    links.forEach(link => {
+                        const linkElement = createLinkElement(link);
+                        container.appendChild(linkElement);
+                    });
+                })
+                .catch(error => console.error('Failed to load links:', error));
+        }
+
+        function createLinkElement(link) {
+            const div = document.createElement('div');
+            div.className = 'content-item link-item';
+            
+            div.innerHTML = `
+                <div class="item-header">
+                    <h4><a href="${link.url}" target="_blank">${link.title || link.url}</a></h4>
+                    <div class="item-actions">
+                        <button onclick="deleteLink(${link.id})">Delete</button>
+                    </div>
+                </div>
+                <div class="description-container">
+                    <div class="description-content" id="note-${link.id}">
+                        <div class="description-fade"></div>
+                        ${formatMessageContent(link.description)}
+                    </div>
+                    <button class="description-toggle" onclick="toggleDescription('note-${link.id}')">
+                        <span>Show more</span>
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="item-meta">
+                    <span class="link-url">${link.url}</span>
+                    <span class="added-date">${new Date(link.created_at).toLocaleDateString()}</span>
+                </div>
+                ${link.tags ? `<div class="tags">${link.tags.join(', ')}</div>` : ''}
+            `;
+            
+            return div;
+        }
+
+        function openLinkModal(link = null) {
+            const modal = document.getElementById('link-modal');
+            const title = document.getElementById('link-modal-title');
+            const form = document.getElementById('link-form');
+            
+            if (link) {
+                title.textContent = 'Edit Link';
+                populateLinkForm(link);
+            } else {
+                title.textContent = 'Add Link';
+                form.reset();
+                document.getElementById('link-id').value = '';
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        function populateLinkForm(link) {
+            document.getElementById('link-id').value = link.id;
+            document.getElementById('link-url').value = link.url;
+            document.getElementById('link-title').value = link.title || '';
+            document.getElementById('link-description').value = link.description || '';
+            document.getElementById('link-tags').value = link.tags ? link.tags.join(', ') : '';
+        }
+
+        function saveLink(e) {
+            e.preventDefault();
+            
+            const linkData = {
+                url: document.getElementById('link-url').value,
+                title: document.getElementById('link-title').value,
+                description: document.getElementById('link-description').value,
+                tags: document.getElementById('link-tags').value.split(',').map(t => t.trim()).filter(t => t)
+            };
+
+            const linkId = document.getElementById('link-id').value;
+            const method = linkId ? 'PUT' : 'POST';
+            const url = linkId ? `/api/links/${linkId}` : '/api/links';
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            showLoading();
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json',  'Authorization': token_str},
+                body: JSON.stringify(linkData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    closeLinkModal();
+                    loadLinks();
+                    showSuccess('Link saved successfully!');
+                }
+            })
+            .catch(error => {
+                hideLoading();
+                console.error('Failed to save link:', error);
+                showError('Failed to save link.');
+            });
+        }
+
+        function editLink(linkId) {
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch(`/api/links/${linkId}`, {headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                .then(response => response.json())
+                .then(link => openLinkModal(link))
+                .catch(error => console.error('Failed to load link:', error));
+        }
+
+        function deleteLink(linkId) {
+            if (confirm('Are you sure you want to delete this link?')) {
+                const token = localStorage.getItem('token');
+                const token_str = 'Bearer ' + token;
+                fetch(`/api/links/${linkId}`, {method: 'DELETE', headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            showError(data.error);
+                        } else {
+                            loadLinks();
+                            showSuccess('Link deleted successfully!');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Failed to delete link:', error);
+                        showError('Failed to delete link.');
+                    });
+            }
+        }
+
+        function closeLinkModal() {
+            document.getElementById('link-modal').style.display = 'none';
+        }
+
+        // Settings management
+        function loadSettings() {
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/settings', {headers: {'Content-Type': 'application/json', 'Authorization': token_str}})
+                .then(response => response.json())
+                .then(settings => {
+                    const status = document.getElementById('api-key-status');
+                    if (settings.has_claude_api_key) {
+                        status.textContent = 'API Key is configured ✓';
+                        status.className = 'api-key-status success';
+                    } else {
+                        status.textContent = 'No API Key configured';
+                        status.className = 'api-key-status error';
+                    }
+                })
+                .catch(error => console.error('Failed to load settings:', error));
+        }
+
+        function saveApiKey() {
+            const apiKey = document.getElementById('claude-api-key').value.trim();
+            
+            if (!apiKey) {
+                showError('Please enter an API key.');
+                return;
+            }
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': token_str},
+                body: JSON.stringify({claude_api_key: apiKey})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    closeNoteModal();
+                    loadNotes();
+                    showSuccess('Note saved successfully!');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to save note:', error);
+                showError('Failed to save note.');
+            });
+        }
+
+        // Chat state management
+        let chatHistory = [];
+        let currentSearchContext = null;
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('search-results');
+            const claudeContainer = document.getElementById('claude-response');
+            
+            claudeContainer.classList.add('hidden');
+            container.innerHTML = '';
+            
+            // Add action buttons at the top
+            const actionBar = document.createElement('div');
+            actionBar.className = 'action-bar';
+            actionBar.innerHTML = `
+                <div class="action-buttons">
+                    <button onclick="clearResults()" class="btn btn-secondary">
+                        <span class="icon">🗑️</span> Clear Results
+                    </button>
+                    <button onclick="saveClaudeConversation()" class="btn btn-primary">
+                        <span class="icon">💾</span> Save Results
+                    </button>
+                    <button onclick="startChat()" class="btn btn-success">
+                        <span class="icon">💬</span> Start Chat
+                    </button>
+                </div>
+            `;
+            container.appendChild(actionBar);
+            
+            if (results.length === 0) {
+                const noResults = document.createElement('div');
+                noResults.className = 'no-results';
+                noResults.innerHTML = '<p>No results found.</p>';
+                container.appendChild(noResults);
+                return;
+            }
+            
+            // Store search context for chat
+            currentSearchContext = {
+                query: document.getElementById('search-input').value,
+                results: results,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Display results
+            const resultsContainer = document.createElement('div');
+            resultsContainer.className = 'results-container-b';
+            
+            results.forEach(result => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'search-result';
+                resultElement.id = `result-${result.source_id}`;
+                
+                let typeIcon = '';
+                switch(result.source_type) {
+                    case 'note': typeIcon = '📝'; break;
+                    case 'file': typeIcon = '📁'; break;
+                    case 'link': typeIcon = '🔗'; break;
+                }
+                
+                // resultElement.innerHTML = `
+                //     <div class="result-header">
+                //         <span class="result-type">${typeIcon} ${result.source_type}</span>
+                //         <span class="result-score">Score: ${result.relevance_score.toFixed(2)}</span>
+                //     </div>
+                //     <h3>${result.title}</h3>
+                //     <p>${result.content}</p>
+                //     <div class="result-meta">
+                //         ${result.tags ? `<span class="tags">${result.tags.join(', ')}</span>` : ''}
+                //         <span class="date">${new Date(result.created_at).toLocaleDateString()}</span>
+                //     </div>
+                // `;
+                resultElement.innerHTML = `
+                    <div class="result-header">
+                        <span class="result-type">${typeIcon} ${result.source_type}</span>
+                        <span class="result-score">Score: ${result.relevance_score.toFixed(2)}</span>
+                        <button onclick="removeResult('${result.source_id}')" class="btn btn-sm btn-danger remove-btn">
+                            ❌ Remove
+                        </button>
+                    </div>
+                    <h3>${result.title}</h3>
+                    <div class="description-container">
+                        <div class="description-content" id="search-${result.source_id}">
+                            <div class="description-fade"></div>
+                            ${formatMessageContent(result.content)}
+                        </div>
+                        <button class="description-toggle" onclick="toggleDescription('search-${result.source_id}')">
+                            <span>Show more</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                    </div>
+                    <div class="result-meta">
+                        <span class="date">${new Date(result.created_at).toLocaleDateString()}</span>
+                    </div>
+                `;
+                
+                resultsContainer.appendChild(resultElement);
+            });
+            
+            container.appendChild(resultsContainer);
+        }
+
+        function removeResult(sourceId) {
+            // Remove from DOM
+            const resultElement = document.getElementById(`result-${sourceId}`);
+            if (resultElement) {
+                resultElement.remove();
+                showNotification('Item Removed.');
+            }
+
+            // Update currentSearchContext
+            if (currentSearchContext && currentSearchContext.results) {
+                currentSearchContext.results = currentSearchContext.results.filter(
+                    result => result.source_id != sourceId
+                );
+            }
+        }
+
+        function clearResults() {
+            const container = document.getElementById('search-results');
+            const claudeContainer = document.getElementById('claude-response');
+            
+            container.innerHTML = '';
+            claudeContainer.classList.add('hidden');
+            claudeContainer.innerHTML = '';
+            
+            // Clear chat history and context
+            chatHistory = [];
+            currentSearchContext = null;
+            
+            // Hide chat interface if visible
+            const chatInterface = document.getElementById('chat-interface');
+            if (chatInterface) {
+                chatInterface.classList.add('hidden');
+            }
+        }
+
+        function saveResults() {
+            if (!currentSearchContext) {
+                alert('No results to save');
+                return;
+            }
+            
+            const saveData = {
+                query: currentSearchContext.query,
+                results: currentSearchContext.results,
+                timestamp: currentSearchContext.timestamp,
+                chatHistory: chatHistory
+            };
+            
+            // Save to localStorage (or send to your backend)
+            const savedSearches = JSON.parse(localStorage.getItem('savedSearches') || '[]');
+            savedSearches.push(saveData);
+            localStorage.setItem('savedSearches', JSON.stringify(savedSearches));
+            
+            // Show success message
+            showNotification('Results saved successfully!');
+        }
+
+        function saveClaudeConversation() {
+        
+            const query = document.getElementById('search-input').value.trim();
+            const timestamp = new Date().toISOString()
+            
+            const chat_text = `${JSON.stringify(currentSearchContext.results, null, 2)}
+             ${JSON.stringify(chatHistory, null, 2)}`;
+
+            const noteData = {
+                title:  query ? query : `Chat-${timestamp}`, 
+                content: chat_text,
+                subject: "",
+                tags: ["ClaudeChat"],
+                priority: null,
+                is_todo: false,
+                due_date: null
+            };
+            // const saveData = {
+            //     query: currentSearchContext.query,
+            //     results: currentSearchContext.results,
+            //     timestamp: currentSearchContext.timestamp,
+            //     chatHistory: chatHistory
+            // };
+
+            const method = 'POST';
+            const url = '/api/notesb';
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json', 'Authorization': token_str},
+                body: JSON.stringify(noteData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    document.getElementById('claude-api-key').value = '';
+                    loadSettings();
+                    showSuccess('Results saved successfully!');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to save note:', error);
+                showError('Failed to save note. Please try again later.');
+            });
+            // Show success message
+            showNotification('Saved to notes successfully!');
+        }
+
+        function saveClaudeResults() {
+        
+            const query = document.getElementById('search-input').value.trim();
+            const timestamp = new Date().toISOString()
+            
+            const noteData = {
+                title:  query ? query : `AskClaude-${timestamp}`,
+                content: originalClaudeResponse,
+                subject: "",
+                tags: ["Claude generated"],
+                priority: null,
+                is_todo: false,
+                due_date: null
+            };
+
+            const method = 'POST';
+            const url = '/api/notesb';
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json', 'Authorization': token_str},
+                body: JSON.stringify(noteData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    document.getElementById('claude-api-key').value = '';
+                    loadSettings();
+                    showSuccess('Results saved successfully!');
+                }
+            })
+            .catch(error => {
+                console.error('Failed to save note:', error);
+                showError('Failed to save note. Please try again later.');
+            });
+            // Show success message
+            showNotification('Saved to notes successfully!');
+        }
+
+        function startChat() {
+            if (!currentSearchContext) {
+                alert('No search context available for chat');
+                return;
+            }
+            
+            // Show chat interface
+            showChatInterface();
+            
+            // Initialize chat with search context
+            if (chatHistory.length === 0) {
+                const initialMessage = {
+                    role: 'system',
+                    content: `Search context: "${currentSearchContext.query}"\nFound ${currentSearchContext.results.length} results.`,
+                    timestamp: new Date().toISOString()
+                };
+                chatHistory.push(initialMessage);
+                displayChatHistory();
+            }
+        }
+
+        function showChatInterface() {
+            // Create chat interface if it doesn't exist
+            let chatInterface = document.getElementById('chat-interface');
+            if (!chatInterface) {
+                chatInterface = document.createElement('div');
+                chatInterface.id = 'chat-interface';
+                chatInterface.className = 'chat-interface';
+                chatInterface.innerHTML = `
+                    <div class="chat-header">
+                        <h3>💬 Chat about your search results</h3>
+                        <button onclick="hideChatInterface()" class="close-chat">×</button>
+                    </div>
+                    <div id="chat-messages" class="chat-messages"></div>
+                    <div class="chat-input-container">
+                        <input type="text" id="chat-input" placeholder="Ask a follow-up question..." 
+                            onkeypress="handleChatKeyPress(event)">
+                        <button onclick="sendChatMessage()" class="btn btn-primary">Send</button>
+                    </div>
+                `;
+                
+                // Insert after search results
+                const searchContainer = document.getElementById('search-results');
+                searchContainer.parentNode.insertBefore(chatInterface, searchContainer.nextSibling);
+            }
+            
+            chatInterface.classList.remove('hidden');
+        }
+
+        function hideChatInterface() {
+            const chatInterface = document.getElementById('chat-interface');
+            if (chatInterface) {
+                chatInterface.classList.add('hidden');
+            }
+        }
+
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to history
+            const userMessage = {
+                role: 'user',
+                content: message,
+                timestamp: new Date().toISOString()
+            };
+            chatHistory.push(userMessage);
+            
+            // Clear input
+            input.value = '';
+            
+            // Display message immediately
+            displayChatHistory();
+            
+            // Show loading indicator
+            showChatLoading();
+            
+            try {
+                // Send to Claude API with context
+
+                const response = await sendToClaude(message);
+                hideChatLoading();
+                // Add Claude's response to history
+                const claudeMessage = {
+                    role: 'assistant',
+                    content: response,
+                    timestamp: new Date().toISOString()
+                };
+                chatHistory.push(claudeMessage);
+                
+                // Update display
+                displayChatHistory();
+                
+            } catch (error) {
+                console.error('Error sending message to Claude:', error);
+                const errorMessage = {
+                    role: 'system',
+                    content: 'Sorry, there was an error processing your message. Please try again.',
+                    timestamp: new Date().toISOString()
+                };
+                chatHistory.push(errorMessage);
+                displayChatHistory();
+            }
+        }
+        function generateSessionId() {
+            // Generate or retrieve session ID
+            let sessionId = localStorage.getItem('chatSessionId');
+            if (!sessionId) {
+                sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('chatSessionId', sessionId);
+            }
+            return sessionId;
+        }
+
+        async function sendToClaude(message) {
+            // Prepare context with search results
+            const token = localStorage.getItem('token');
+            const token_str = 'Bearer ' + token;
+            const contextSummary = currentSearchContext.results.map(result => 
+                `${result.type}: ${result.title} - ${result.content.substring(0, 200)}...`
+            ).join('\n');
+            
+            const fullPrompt = `${message}`;
+            
+            // Replace with your actual Claude API call
+            const response = await fetch('/api/claude-chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', "Authorization": token_str
+                },
+                body: JSON.stringify({
+                    message: fullPrompt,
+                    context: currentSearchContext,
+                    session_id: generateSessionId()
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data.response;
+        }
+
+        function displayChatHistory() {
+            const messagesContainer = document.getElementById('chat-messages');
+            if (!messagesContainer) return;
+            
+            messagesContainer.innerHTML = '';
+            
+            chatHistory.forEach(message => {
+                if (message.role === 'system') return; // Skip system messages in display
+                
+                const messageElement = document.createElement('div');
+                messageElement.className = `chat-message ${message.role}`;
+                
+                const timeStr = new Date(message.timestamp).toLocaleTimeString();
+                
+                if (message.role === 'Claude'){
+
+                }
+                const msgStr = 
+
+                messageElement.innerHTML = `
+                    <div class="message-header">
+                        <span class="sender">${message.role === 'user' ? 'You' : 'Claude'}</span>
+                        <span class="timestamp">${timeStr}</span>
+                    </div>
+                    <div class="message-content">${formatMessageContent(message.content)}</div>
+                `;
+                
+                messagesContainer.appendChild(messageElement);
+            });
+            
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideChatLoading() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const loadingElements = messagesContainer.querySelectorAll('.loading');
+            loadingElements.forEach(el => el.remove());
+        }
+
+        function showChatLoading() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const loadingElement = document.createElement('div');
+            loadingElement.className = 'chat-message assistant loading';
+            loadingElement.innerHTML = `
+                <div class="message-header">
+                    <span class="sender">Claude</span>
+                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(loadingElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Remove loading indicator after response
+            // setTimeout(() => {
+            //     const loadingElements = messagesContainer.querySelectorAll('.loading');
+            //     loadingElements.forEach(el => el.remove());
+            // }, 1000);
+        }
+
+        function showNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            
+            // Add to page
+            document.body.appendChild(notification);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            const clickedDropdownMenuName = "menu-" + e.target.id;
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                if (menu.id === clickedDropdownMenuName) {
+                // Toggle only the clicked one
+                    menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+                } else {
+                    // Close all others
+                    menu.style.display = 'none';
+                }
+                });
+        });
+
+        // Close dropdowns on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                    menu.style.display = 'none';
+                });
+            }
+        });
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
+        
+
+
+
+        
+                

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login & Register</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .form-container {
+            padding: 40px;
+        }
+
+        .form-container.hidden {
+            display: none;
+        }
+
+        .form-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-header h2 {
+            color: #333;
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .form-header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group input:invalid {
+            border-color: #e74c3c;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .form-footer {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e5e9;
+        }
+
+        .form-footer p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .form-footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .form-footer a:hover {
+            color: #764ba2;
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .password-toggle {
+            position: relative;
+        }
+
+        .password-toggle input {
+            padding-right: 45px;
+        }
+
+        .password-toggle button {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 0.9rem;
+            padding: 4px;
+        }
+
+        .password-toggle button:hover {
+            color: #333;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .form-container {
+                padding: 30px 25px;
+            }
+            
+            .form-header h2 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Form -->
+        <div id="loginForm" class="form-container">
+            <div class="form-header">
+                <h2>Welcome Back</h2>
+                <p>Sign in to your account</p>
+            </div>
+            
+            <div id="loginAlert" class="alert"></div>
+            
+            <form id="loginFormElement">
+                <div class="form-group">
+                    <label for="loginEmail">Email Address</label>
+                    <input type="email" id="loginEmail" name="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <div class="password-toggle">
+                        <input type="password" id="loginPassword" name="password" required>
+                        <button type="button" onclick="togglePassword('loginPassword')">Show</button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn" id="loginBtn">Sign In</button>
+                <div class="loading" id="loginLoading"></div>
+            </form>
+            
+            <div class="form-footer">
+                <p>Don't have an account? <a onclick="showRegister()">Create one</a></p>
+            </div>
+        </div>
+
+        <!-- Register Form -->
+        <div id="registerForm" class="form-container hidden">
+            <div class="form-header">
+                <h2>Create Account</h2>
+                <p>Join us today</p>
+            </div>
+            
+            <div id="registerAlert" class="alert"></div>
+            
+            <form id="registerFormElement">
+                <div class="form-group">
+                    <label for="registerName">Full Name</label>
+                    <input type="text" id="registerName" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="registerEmail">Email Address</label>
+                    <input type="email" id="registerEmail" name="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <div class="password-toggle">
+                        <input type="password" id="registerPassword" name="password" required minlength="6">
+                        <button type="button" onclick="togglePassword('registerPassword')">Show</button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <div class="password-toggle">
+                        <input type="password" id="confirmPassword" name="confirmPassword" required>
+                        <button type="button" onclick="togglePassword('confirmPassword')">Show</button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn" id="registerBtn">Create Account</button>
+                <div class="loading" id="registerLoading"></div>
+            </form>
+            
+            <div class="form-footer">
+                <p>Already have an account? <a onclick="showLogin()">Sign in</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Update these URLs to match your Flask API
+        const API_BASE_URL = 'http://ec2-54-213-127-101.us-west-2.compute.amazonaws.com/'; // Change this to your API URL
+        const LOGIN_ENDPOINT = '/api/login';
+        const REGISTER_ENDPOINT = '/api/register';
+
+        // Form switching functions
+        function showLogin() {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            clearAlerts();
+        }
+
+        function showRegister() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+            clearAlerts();
+        }
+
+        function clearAlerts() {
+            document.getElementById('loginAlert').style.display = 'none';
+            document.getElementById('registerAlert').style.display = 'none';
+        }
+
+        // Password toggle functionality
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            const button = field.nextElementSibling;
+            
+            if (field.type === 'password') {
+                field.type = 'text';
+                button.textContent = 'Hide';
+            } else {
+                field.type = 'password';
+                button.textContent = 'Show';
+            }
+        }
+
+        // Alert functions
+        function showAlert(alertId, message, type) {
+            const alert = document.getElementById(alertId);
+            alert.textContent = message;
+            alert.className = `alert ${type}`;
+            alert.style.display = 'block';
+        }
+
+        function hideAlert(alertId) {
+            document.getElementById(alertId).style.display = 'none';
+        }
+
+        // Loading state functions
+        function showLoading(loadingId, buttonId) {
+            document.getElementById(loadingId).style.display = 'block';
+            document.getElementById(buttonId).disabled = true;
+        }
+
+        function hideLoading(loadingId, buttonId) {
+            document.getElementById(loadingId).style.display = 'none';
+            document.getElementById(buttonId).disabled = false;
+        }
+
+        // Login form handler
+        document.getElementById('loginFormElement').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            showLoading('loginLoading', 'loginBtn');
+            hideAlert('loginAlert');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}${LOGIN_ENDPOINT}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store token in localStorage (or handle as needed)
+                    localStorage.setItem('token', data.token);
+                    showAlert('loginAlert', 'Login successful! Redirecting...', 'success');
+                    
+                    // Redirect to dashboard or home page
+                    setTimeout(() => {
+                        window.location.href = '/archive'; // Change this to your dashboard URL
+                    }, 1500);
+                } else {
+                    showAlert('loginAlert', data.message || 'Login failed. Please try again.', 'error');
+                }
+            } catch (error) {
+                showAlert('loginAlert', 'Network error. Please check your connection.', 'error');
+            } finally {
+                hideLoading('loginLoading', 'loginBtn');
+            }
+        });
+
+        // Register form handler
+        document.getElementById('registerFormElement').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Client-side validation
+            if (password !== confirmPassword) {
+                showAlert('registerAlert', 'Passwords do not match.', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showAlert('registerAlert', 'Password must be at least 6 characters long.', 'error');
+                return;
+            }
+            
+            showLoading('registerLoading', 'registerBtn');
+            hideAlert('registerAlert');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}${REGISTER_ENDPOINT}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('registerAlert', 'Account created successfully! Please sign in.', 'success');
+                    
+                    // Clear form and switch to login after delay
+                    setTimeout(() => {
+                        document.getElementById('registerFormElement').reset();
+                        showLogin();
+                    }, 2000);
+                } else {
+                    showAlert('registerAlert', data.message || 'Registration failed. Please try again.', 'error');
+                }
+            } catch (error) {
+                showAlert('registerAlert', 'Network error. Please check your connection.', 'error');
+            } finally {
+                hideLoading('registerLoading', 'registerBtn');
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is already logged in
+            const token = localStorage.getItem('token');
+            if (token) {
+                // Optionally redirect to dashboard if already logged in
+                // window.location.href = '/dashboard';
+            }
+        });
+    </script>
+</body>
+</html>
