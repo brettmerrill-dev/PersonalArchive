@@ -14,7 +14,7 @@ npm run build  # Creates distributable files
 
 
 
-# EC2 Deployment Guide for Your Interview App
+# EC2 Deployment Guide for Your App
 
 ## Step 1: Launch EC2 Instance
 
