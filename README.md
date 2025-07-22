@@ -14,7 +14,7 @@ npm run build  # Creates distributable files
 
 
 
-# EC2 Deployment Guide for Your Interview App
+# EC2 Deployment Guide for Your App
 
 ## Step 1: Launch EC2 Instance
 
@@ -120,7 +120,7 @@ curl http://localhost:5000
 
 ```bash
 # Create Nginx configuration
-sudo nano /etc/nginx/sites-available/interview-app
+sudo nano /etc/nginx/sites-available/PersonalArchive
 ```
 
 Add this content:
@@ -142,7 +142,7 @@ server {
 Enable the site:
 ```bash
 # Enable the site
-sudo ln -s /etc/nginx/sites-available/interview-app /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/PersonalArchive /etc/nginx/sites-enabled/
 
 # Remove default site
 sudo rm /etc/nginx/sites-enabled/default
