@@ -480,7 +480,7 @@ class RAGSystem:
         session.add_message('user', query)
         
         # Prepare context text from search results
-        context_text = self._prepare_context_text(context.get("results", []))
+        context_text = self._prepare_context_text(context)
         
         # Get recent chat history
         recent_messages = session.get_recent_messages()
@@ -1203,6 +1203,7 @@ def claude_chat():
         
         message = data.get('message', '').strip()
         context = data.get('context', {})
+        content = context.get("results", [])
         session_id = data.get('session_id', 'default')
         
         if not message:
@@ -1230,7 +1231,7 @@ def claude_chat():
             return jsonify({'error': 'Claude API key not configured'}), 400
         # Call Claude API
         response = rag_system.query_claude_b(
-            user.claude_api_key, message, context, session_id
+            user.claude_api_key, message, content, session_id
         )
         
         claude_response = response.get("response")
